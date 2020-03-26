@@ -79,8 +79,8 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&publicKeyRingPath, "publicKeyRingPath", "", "the path to the PGP public key ring")
 	RootCmd.PersistentFlags().StringVar(&workingDirectory, "workingDirectory", "~/.zfsbackup", "the working directory path for zfsbackup.")
 	RootCmd.PersistentFlags().StringVar(&jobInfo.ManifestPrefix, "manifestPrefix", "manifests", "the prefix to use for all manifest files.")
-	RootCmd.PersistentFlags().StringVar(&jobInfo.EncryptTo, "encryptTo", "", "the email of the user to encrypt the data to from the provided public keyring.")
-	RootCmd.PersistentFlags().StringVar(&jobInfo.SignFrom, "signFrom", "", "the email of the user to sign on behalf of from the provided private keyring.")
+	RootCmd.PersistentFlags().StringVar(&jobInfo.EncryptMail, "encryptMail", "", "the email of the user used for encryption/decryption from the corresponding public/private keyring.")
+	RootCmd.PersistentFlags().StringVar(&jobInfo.SignMail, "signMail", "", "the email of the user used for signing/verifying from the corresponding private/public keyring.")
 	RootCmd.PersistentFlags().StringVar(&helpers.ZFSPath, "zfsPath", "zfs", "the path to the zfs executable.")
 	RootCmd.PersistentFlags().BoolVar(&helpers.JSONOutput, "jsonOutput", false, "dump results as a JSON string - on success only")
 	passphrase = []byte(os.Getenv("PGP_PASSPHRASE"))
@@ -94,8 +94,8 @@ func resetRootFlags() {
 	publicKeyRingPath = ""
 	workingDirectory = "~/.zfsbackup"
 	jobInfo.ManifestPrefix = "manifests"
-	jobInfo.EncryptTo = ""
-	jobInfo.SignFrom = ""
+	jobInfo.EncryptMail = ""
+	jobInfo.SignMail = ""
 	helpers.ZFSPath = "zfs"
 	helpers.JSONOutput = false
 }
@@ -146,66 +146,6 @@ func processFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	helpers.AppLogger.Infof("Loaded public key ring %s", publicKeyRingPath)
-
-	if jobInfo.EncryptTo != "" && secretKeyRingPath == "" {
-		helpers.AppLogger.Errorf("You must specify a private keyring path if you provide an encryptFrom option")
-		return errInvalidInput
-	}
-
-	if jobInfo.SignFrom != "" && publicKeyRingPath == "" {
-		helpers.AppLogger.Errorf("You must specify a public keyring path if you provide an signTo option")
-		return errInvalidInput
-	}
-
-	if jobInfo.EncryptTo != "" {
-		if jobInfo.EncryptKey = helpers.GetPrivateKeyByEmail(jobInfo.EncryptTo); jobInfo.EncryptKey == nil {
-			helpers.AppLogger.Errorf("Could not find public key for %s", jobInfo.EncryptTo)
-			return errInvalidInput
-		}
-
-		if jobInfo.EncryptKey.PrivateKey != nil && jobInfo.EncryptKey.PrivateKey.Encrypted {
-			validatePassphrase()
-			if err := jobInfo.EncryptKey.PrivateKey.Decrypt(passphrase); err != nil {
-				helpers.AppLogger.Errorf("Error decrypting private key: %v", err)
-				return errInvalidInput
-			}
-		}
-
-		for _, subkey := range jobInfo.EncryptKey.Subkeys {
-			if subkey.PrivateKey != nil && subkey.PrivateKey.Encrypted {
-				validatePassphrase()
-				if err := subkey.PrivateKey.Decrypt(passphrase); err != nil {
-					helpers.AppLogger.Errorf("Error decrypting subkey's private key: %v", err)
-					return errInvalidInput
-				}
-			}
-		}
-	}
-
-	if jobInfo.SignFrom != "" {
-		if jobInfo.SignKey = helpers.GetPrivateKeyByEmail(jobInfo.SignFrom); jobInfo.SignKey == nil {
-			helpers.AppLogger.Errorf("Could not find private key for %s", jobInfo.SignFrom)
-			return errInvalidInput
-		}
-
-		if jobInfo.SignKey.PrivateKey != nil && jobInfo.SignKey.PrivateKey.Encrypted {
-			validatePassphrase()
-			if err := jobInfo.SignKey.PrivateKey.Decrypt(passphrase); err != nil {
-				helpers.AppLogger.Errorf("Error decrypting private key: %v", err)
-				return errInvalidInput
-			}
-		}
-
-		for _, subkey := range jobInfo.SignKey.Subkeys {
-			if subkey.PrivateKey != nil && subkey.PrivateKey.Encrypted {
-				validatePassphrase()
-				if err := subkey.PrivateKey.Decrypt(passphrase); err != nil {
-					helpers.AppLogger.Errorf("Error decrypting subkey's private key: %v", err)
-					return errInvalidInput
-				}
-			}
-		}
-	}
 
 	if err := setupGlobalVars(); err != nil {
 		return err
@@ -295,4 +235,48 @@ func validatePassphrase() {
 			panic(err)
 		}
 	}
+}
+
+func decryptSignKey() error {
+	if jobInfo.SignKey.PrivateKey != nil && jobInfo.SignKey.PrivateKey.Encrypted {
+		validatePassphrase()
+		if err := jobInfo.SignKey.PrivateKey.Decrypt(passphrase); err != nil {
+			helpers.AppLogger.Errorf("Error decrypting private key: %v", err)
+			return errInvalidInput
+		}
+	}
+
+	for _, subkey := range jobInfo.SignKey.Subkeys {
+		if subkey.PrivateKey != nil && subkey.PrivateKey.Encrypted {
+			validatePassphrase()
+			if err := subkey.PrivateKey.Decrypt(passphrase); err != nil {
+				helpers.AppLogger.Errorf("Error decrypting subkey's private key: %v", err)
+				return errInvalidInput
+			}
+		}
+	}
+
+	return nil
+}
+
+func decryptEncryptKey() error {
+	if jobInfo.EncryptKey.PrivateKey != nil && jobInfo.EncryptKey.PrivateKey.Encrypted {
+		validatePassphrase()
+		if err := jobInfo.EncryptKey.PrivateKey.Decrypt(passphrase); err != nil {
+			helpers.AppLogger.Errorf("Error decrypting private key: %v", err)
+			return errInvalidInput
+		}
+	}
+
+	for _, subkey := range jobInfo.EncryptKey.Subkeys {
+		if subkey.PrivateKey != nil && subkey.PrivateKey.Encrypted {
+			validatePassphrase()
+			if err := subkey.PrivateKey.Decrypt(passphrase); err != nil {
+				helpers.AppLogger.Errorf("Error decrypting subkey's private key: %v", err)
+				return errInvalidInput
+			}
+		}
+	}
+
+	return nil
 }

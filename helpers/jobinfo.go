@@ -49,8 +49,8 @@ type JobInfo struct {
 	ZFSStreamBytes          uint64
 	Volumes                 []*VolumeInfo
 	Version                 float64
-	EncryptTo               string
-	SignFrom                string
+	EncryptMail             string
+	SignMail                string
 	Replication             bool
 	Deduplication           bool
 	Properties              bool

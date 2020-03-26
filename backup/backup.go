@@ -589,13 +589,13 @@ func tryResume(ctx context.Context, j *helpers.JobInfo) error {
 			return fmt.Errorf("option mismatch")
 		}
 
-		if originalManifest.EncryptTo != j.EncryptTo {
-			helpers.AppLogger.Errorf("Cannot resume backup, different encryptTo flags specified (original %v != current %v)", originalManifest.EncryptTo, j.EncryptTo)
+		if originalManifest.EncryptMail != j.EncryptMail {
+			helpers.AppLogger.Errorf("Cannot resume backup, different encryptMail flags specified (original %v != current %v)", originalManifest.EncryptMail, j.EncryptMail)
 			return fmt.Errorf("option mismatch")
 		}
 
-		if originalManifest.SignFrom != j.SignFrom {
-			helpers.AppLogger.Errorf("Cannot resume backup, different signFrom flags specified (original %v != current %v)", originalManifest.SignFrom, j.SignFrom)
+		if originalManifest.SignMail != j.SignMail {
+			helpers.AppLogger.Errorf("Cannot resume backup, different signMail flags specified (original %v != current %v)", originalManifest.SignMail, j.SignMail)
 			return fmt.Errorf("option mismatch")
 		}
 

@@ -143,5 +143,33 @@ func validateReceiveFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Signing and encryption have to be done here to
+	// make sure that we read from the right keyring
+	if jobInfo.EncryptMail != "" && secretKeyRingPath == "" {
+		helpers.AppLogger.Errorf("You must specify a private keyring path in order to decrypt a backup")
+		return errInvalidInput
+	}
+
+	if jobInfo.SignMail != "" && publicKeyRingPath == "" {
+		helpers.AppLogger.Errorf("You must specify a public keyring path in order to verify a signature on a backup")
+		return errInvalidInput
+	}
+
+	if jobInfo.EncryptMail != "" {
+		if jobInfo.EncryptKey = helpers.GetPrivateKeyByEmail(jobInfo.EncryptMail); jobInfo.EncryptKey == nil {
+			helpers.AppLogger.Errorf("Could not find private key for %s", jobInfo.EncryptMail)
+			return errInvalidInput
+		}
+		return decryptEncryptKey()
+	}
+
+	if jobInfo.SignMail != "" {
+		if jobInfo.SignKey = helpers.GetPublicKeyByEmail(jobInfo.SignMail); jobInfo.SignKey == nil {
+			helpers.AppLogger.Errorf("Could not find public key for %s", jobInfo.SignMail)
+			return errInvalidInput
+		}
+		return decryptSignKey()
+	}
+
 	return nil
 }

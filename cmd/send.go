@@ -53,11 +53,11 @@ var sendCmd = &cobra.Command{
 		helpers.AppLogger.Infof("Max Upload Retry Time will be %v", jobInfo.MaxRetryTime)
 		helpers.AppLogger.Infof("Upload Chunk Size will be %dMiB", jobInfo.UploadChunkSize)
 		if jobInfo.EncryptKey != nil {
-			helpers.AppLogger.Infof("Will be using encryption key for %s", jobInfo.EncryptTo)
+			helpers.AppLogger.Infof("Will be using encryption key for %s", jobInfo.EncryptMail)
 		}
 
 		if jobInfo.SignKey != nil {
-			helpers.AppLogger.Infof("Will be signed from %s", jobInfo.SignFrom)
+			helpers.AppLogger.Infof("Will be signed from %s", jobInfo.SignMail)
 		}
 
 		return backup.Backup(context.Background(), &jobInfo)
@@ -219,6 +219,34 @@ func validateSendFlags(cmd *cobra.Command, args []string) error {
 	if err := jobInfo.ValidateSendFlags(); err != nil {
 		helpers.AppLogger.Error(err)
 		return err
+	}
+
+	// Signing and encryption have to be done here to
+	// make sure that we read from the right keyring
+	if jobInfo.EncryptMail != "" && publicKeyRingPath == "" {
+		helpers.AppLogger.Errorf("You must specify a public keyring path in order to encrypt a backup")
+		return errInvalidInput
+	}
+
+	if jobInfo.SignMail != "" && secretKeyRingPath == "" {
+		helpers.AppLogger.Errorf("You must specify a private keyring path in order to sign a backup")
+		return errInvalidInput
+	}
+
+	if jobInfo.EncryptMail != "" {
+		if jobInfo.EncryptKey = helpers.GetPublicKeyByEmail(jobInfo.EncryptMail); jobInfo.EncryptKey == nil {
+			helpers.AppLogger.Errorf("Could not find public key for %s", jobInfo.EncryptMail)
+			return errInvalidInput
+		}
+		return decryptEncryptKey()
+	}
+
+	if jobInfo.SignMail != "" {
+		if jobInfo.SignKey = helpers.GetPrivateKeyByEmail(jobInfo.SignMail); jobInfo.SignKey == nil {
+			helpers.AppLogger.Errorf("Could not find private key for %s", jobInfo.SignMail)
+			return errInvalidInput
+		}
+		return decryptSignKey()
 	}
 
 	return updateJobInfo(args)
